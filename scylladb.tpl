@@ -1,0 +1,4 @@
+--clustername ${cluster_name}
+--totalnodes ${total_nodes}
+--bootstrap true
+--seeds "${seed}"
