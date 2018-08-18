@@ -7,4 +7,15 @@ sed -r -i "/SCYLLA_JMX_ADDR/s/^\#//" $env_default
 sed -r -i "/SCYLLA_JMX_ADDR/s/localhost/$ip_address/" $env_default
 sed -r -i "/SCYLLA_JMX_REMOTE/s/^\#//" $env_default
 
-systemctl scylla-jmx restart
+systemctl restart scylla-jmx
+
+yum -y -q intall net-snmp net-snmp-utils
+cat <<EOF > /etc/snmp/snmpd.conf
+rocommunity public default
+syslocation AWS
+syscontact Account Manager
+dontLogTCPWrappersConnects yes
+disk /
+EOF
+systemctl enable snmpd
+systemctl start snmpd

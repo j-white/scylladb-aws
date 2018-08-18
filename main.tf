@@ -25,12 +25,12 @@ resource "null_resource" "scylladb" {
   }
 
   provisioner "file" {
-    source      = "./scylla-jmx-init.sh"
+    source      = "./scylla-init.sh"
     destination = "/tmp"
   }
 
   provisioner "remote-exec" {
-    inline = [ "cd /tmp && chmod +x scylla-jmx-init.sh && ./scylla-jmx-init.sh" ]
+    inline = [ "sudo sh /tmp/scylla-init.sh" ]
   }
 }
 
@@ -94,4 +94,12 @@ resource "aws_instance" "opennms" {
   tags {
     Name = "Terraform OpenNMS Server"
   }
+}
+
+output "scylladb" {
+  value = "${join(",",aws_instance.scylladb.*.public_ip)}"
+}
+
+output "onmscore" {
+  value = "${aws_instance.opennms.public_ip}"
 }
