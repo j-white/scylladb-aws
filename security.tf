@@ -47,6 +47,7 @@ resource "aws_security_group" "scylladb" {
     from_port   = 7199
     to_port     = 7599
     protocol    = "tcp"
+    description = "JMX"
     cidr_blocks = ["${var.vpc_cidr}"]
   }
 
@@ -54,6 +55,7 @@ resource "aws_security_group" "scylladb" {
     from_port   = 7000
     to_port     = 7020
     protocol    = "tcp"
+    description = "Intra Node"
     cidr_blocks = ["${var.vpc_cidr}"]
   }
 
@@ -61,6 +63,7 @@ resource "aws_security_group" "scylladb" {
     from_port   = 9042
     to_port     = 9442
     protocol    = "tcp"
+    description = "CQL Native"
     cidr_blocks = ["${var.vpc_cidr}"]
   }
 
@@ -68,6 +71,7 @@ resource "aws_security_group" "scylladb" {
     from_port   = 9160
     to_port     = 9560
     protocol    = "tcp"
+    description = "Thrift"
     cidr_blocks = ["${var.vpc_cidr}"]
   }
 
@@ -90,9 +94,18 @@ resource "aws_security_group" "opennms" {
   description = "Allow OpenNMS connections."
 
   ingress {
+    from_port   = 8101
+    to_port     = 8101
+    protocol    = "tcp"
+    description = "Karaf Shell"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     from_port   = 8980
     to_port     = 8980
     protocol    = "tcp"
+    description = "ONMS WebUI"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -100,6 +113,7 @@ resource "aws_security_group" "opennms" {
     from_port   = 18980
     to_port     = 18980
     protocol    = "tcp"
+    description = "ONMS JMX"
     cidr_blocks = ["${var.vpc_cidr}"]
   }
 

@@ -4,6 +4,7 @@ provider "aws" {
   region = "${var.aws_region}"
 }
 
+# The template to use when initializing a ScyllaDB instance based on their documentation
 data "template_file" "scylladb" {
   template = "${file("${path.module}/scylladb.tpl")}"
 
@@ -14,6 +15,7 @@ data "template_file" "scylladb" {
   }
 }
 
+# Custom provider to fix Scylla JMX access, and install the SNMP agent.
 resource "null_resource" "scylladb" {
   count = "${length(aws_instance.scylladb.*.ami)}"
   triggers = {
@@ -34,6 +36,7 @@ resource "null_resource" "scylladb" {
   }
 }
 
+# The ScyllaDB instances
 resource "aws_instance" "scylladb" {
   count         = "${length(var.scylladb_ip_addresses)}"
   ami           = "${var.settings["scylladb_ami_id"]}"
@@ -60,6 +63,7 @@ resource "aws_instance" "scylladb" {
   }
 }
 
+# The template to install and configure OpenNMS
 data "template_file" "opennms" {
   template = "${file("${path.module}/opennms.tpl")}"
 

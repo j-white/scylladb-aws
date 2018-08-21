@@ -129,6 +129,7 @@ if [ "$mem_in_mb" -gt "30720" ]; then
   mem_in_mb="30720"
 fi
 
+# JVM Configuration with an advanced tuning for G1GC based on the chosen EC2 instance type
 cat <<EOF > $opennms_etc/opennms.conf
 START_TIMEOUT=0
 JAVA_HEAP_SIZE=$mem_in_mb
@@ -179,23 +180,31 @@ admin readwrite
 jmx   readonly
 EOF
 
-# External Cassandra
+# External ScyllaDB
 # For 16 Cores, over 32GB of RAM, and a minimum of 16GB of ONMS Heap size on the OpenNMS server.
+# IMPORTANT:
+# - The ring_buffer_size, cache.max_entries, and writer_threads depends on the running environment.
+#   They should be consistent with the settings to be used with the metrics:stress tool.
 newts_cfg=$opennms_etc/opennms.properties.d/newts.properties
 cat <<EOF > $newts_cfg
+# Basic Settings
 org.opennms.timeseries.strategy=newts
 org.opennms.newts.config.hostname=$cassandra_server
 org.opennms.newts.config.keyspace=newts
 org.opennms.newts.config.port=9042
-org.opennms.newts.query.minimum_step=30000
-org.opennms.newts.query.heartbeat=45000
+# Production settings based required for the expected results from the metrics:stress tool
 org.opennms.newts.config.ring_buffer_size=$ring_buffer_size
 org.opennms.newts.config.cache.max_entries=$cache_max_entries
 org.opennms.newts.config.writer_threads=$num_of_cores
 org.opennms.newts.config.cache.priming.enable=true
 org.opennms.newts.config.cache.priming.block_ms=-1
+# For collecting data every 30 seconds from OpenNMS and Cassandra
+org.opennms.newts.query.minimum_step=30000
+org.opennms.newts.query.heartbeat=450000
 EOF
 
+# This is the production ready configuration for the Newts keyspace, using NetworkTopologyStrategy and TimeWindowCompactionStrategy
+# It is always a good idea to start with NetworkTopologyStrategy, even if a Multi-DC environment won't be used.
 newts_cql=$opennms_etc/newts.cql
 cat <<EOF > $newts_cql
 CREATE KEYSPACE newts WITH replication = {'class' : 'NetworkTopologyStrategy', '$cassandra_dc' : $cassandra_rf };
@@ -241,7 +250,8 @@ CREATE TABLE newts.resource_metrics (
 );
 EOF
 
-# WARNING: For testing purposes only. Lab collection and polling interval (30 seconds)
+# To poll and collect statistics from OpenNMS and the ScyllaDB nodes every 30 seconds
+# This is not intended for production, it is here to be able to see how the solution behaves while running the metrics:stress tool.
 sed -r -i 's/step="300"/step="30"/g' $opennms_etc/telemetryd-configuration.xml 
 sed -r -i 's/interval="300000"/interval="30000"/g' $opennms_etc/collectd-configuration.xml 
 sed -r -i 's/interval="300000" user/interval="30000" user/g' $opennms_etc/poller-configuration.xml 
