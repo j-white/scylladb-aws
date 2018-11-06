@@ -13,7 +13,15 @@ echo "### Installing common packages..."
 
 yum -y -q update
 yum -y -q install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-yum -y -q install jq net-snmp net-snmp-utils git pytz dstat htop nmap-ncat tree
+yum -y -q install jq net-snmp net-snmp-utils git pytz dstat htop nmap-ncat tree telnet curl nmon
+yum -y -q install maven
+
+echo "### Configuring Hostname and Domain..."
+
+ip_address=$(curl http://169.254.169.254/latest/meta-data/local-ipv4 2>/dev/null)
+hostnamectl set-hostname --static $hostname
+echo "preserve_hostname: true" > /etc/cloud/cloud.cfg.d/99_hostname.cfg
+sed -i -r "s/^[#]?Domain =.*/Domain = $domainname/" /etc/idmapd.conf
 
 echo "### Configuring Kernel..."
 
@@ -86,7 +94,7 @@ systemctl start haveged
 
 echo "### Downloading and installing latest Oracle JDK 8..."
 
-java_url="http://download.oracle.com/otn-pub/java/jdk/8u181-b13/96a7b8442fe848ef90c96a2fad6ed6d1/jdk-8u181-linux-x64.rpm"
+java_url="https://download.oracle.com/otn-pub/java/jdk/8u191-b12/2787e4a523244c269598db4e85c51e0c/jdk-8u191-linux-x64.rpm"
 java_rpm=/tmp/jdk8-linux-x64.rpm
 
 wget -c --quiet --header "Cookie: oraclelicense=accept-securebackup-cookie" -O $java_rpm $java_url
@@ -141,8 +149,6 @@ ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -Xloggc:/opt/opennms/lo
 ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -XX:+UseGCLogFileRotation"
 ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -XX:NumberOfGCLogFiles=10"
 ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -XX:GCLogFileSize=10M"
-
-ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
 
 ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -XX:+UseStringDeduplication"
 ADDITIONAL_MANAGER_OPTIONS="\$ADDITIONAL_MANAGER_OPTIONS -XX:+UseG1GC"
@@ -282,9 +288,8 @@ cqlsh -f $newts_cql $cassandra_server
 echo "### Creating Requisition..."
 
 mkdir -p $opennms_etc/imports/pending/
-echo <<EOF > $opennms_etc/imports/pending/AWS.xml
-<model-import xmlns="http://xmlns.opennms.org/xsd/config/model-import" date-stamp="2018-08-17T20:10:19.311Z" foreign-source="AWS" last-impo
-rt="2018-08-17T20:10:25.193Z">
+cat <<EOF > $opennms_etc/imports/pending/AWS.xml
+<model-import xmlns="http://xmlns.opennms.org/xsd/config/model-import" date-stamp="2018-08-17T20:10:19.311Z" foreign-source="AWS" last-import="2018-08-17T20:10:25.193Z">
    <node foreign-id="opennms-server" node-label="opennms-server">
       <interface ip-addr="$ip_address" status="1" snmp-primary="P"/>
       <interface ip-addr="127.0.0.1" status="1" snmp-primary="N">
@@ -301,7 +306,7 @@ rt="2018-08-17T20:10:25.193Z">
 EOF
 
 mkdir -p $opennms_etc/foreign-sources/pending/
-echo <<EOF > $opennms_etc/foreign-sources/pending/AWS.xml
+cat <<EOF > $opennms_etc/foreign-sources/pending/AWS.xml
 <foreign-source xmlns="http://xmlns.opennms.org/xsd/config/foreign-source" name="AWS" date-stamp="2018-08-17T20:08:48.598Z">
    <scan-interval>1d</scan-interval>
    <detectors>
@@ -324,3 +329,16 @@ until printf "" 2>>/dev/null >>/dev/tcp/$ip_address/8980; do printf '.'; sleep 1
 echo "### Import Test Requisition..."
 
 $opennms_home/bin/provision.pl requisition import AWS
+
+echo "### Downloading & Starting Scylla Monitoring"
+
+yum -y -q install docker
+systemctl enable docker
+systemctl start docker
+
+wget https://github.com/scylladb/scylla-grafana-monitoring/archive/scylla-monitoring-2.0.tar.gz
+tar -xvf scylla-monitoring-2.0.tar.gz
+cd scylla-grafana-monitoring-scylla-monitoring-2.0
+
+sudo ./genconfig.py -d prometheus -sn ${scylladb_ip_addresses}
+./start-all.sh

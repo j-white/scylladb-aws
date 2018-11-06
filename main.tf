@@ -27,12 +27,20 @@ resource "null_resource" "scylladb" {
   }
 
   provisioner "file" {
-    source      = "./scylla-init.sh"
-    destination = "/tmp"
+    source      = "./scylladb-init.sh"
+    destination = "/tmp/scylladb-init.sh"
+    connection {
+      type     = "ssh"
+      user     = "centos"
+    }
   }
 
   provisioner "remote-exec" {
-    inline = [ "sudo sh /tmp/scylla-init.sh" ]
+    inline = [ "sudo sh /tmp/scylladb-init.sh" ]
+    connection {
+      type     = "ssh"
+      user     = "centos"
+    }
   }
 }
 
@@ -59,7 +67,7 @@ resource "aws_instance" "scylladb" {
   }
 
   tags {
-    Name = "Terraform ScyllaDB Server ${count.index + 1}"
+    Name = "ScyllaDB Testing - ScyllaDB Server ${count.index + 1}"
   }
 }
 
@@ -73,6 +81,7 @@ data "template_file" "opennms" {
     cassandra_rf      = "${var.settings["scylladb_replication_factor"]}"
     cache_max_entries = "${var.settings["opennms_cache_max_entries"]}"
     ring_buffer_size  = "${var.settings["opennms_ring_buffer_size"]}"
+    scylladb_ip_addresses = "${join(" ", var.scylladb_ip_addresses)}"
   }
 }
 resource "aws_instance" "opennms" {
@@ -96,7 +105,7 @@ resource "aws_instance" "opennms" {
   }
 
   tags {
-    Name = "Terraform OpenNMS Server"
+    Name = "ScyllaDB Testing - OpenNMS Server"
   }
 }
 
